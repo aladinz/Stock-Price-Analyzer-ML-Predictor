@@ -137,6 +137,13 @@ else:
             
             df_clean = df.dropna()
             
+            # Validate we have enough data for train/test split
+            min_samples = int(10 / (test_size/100))  # At least 10 test samples
+            if len(df_clean) < max(30, min_samples):
+                st.error(f"❌ Error: Not enough data for analysis. Need at least {max(30, min_samples)} data points, but only have {len(df_clean)} after cleaning.")
+                st.info("💡 Tip: Try extending the date range or selecting a more established stock ticker.")
+                st.stop()
+            
             X = df_clean[['Close', 'MA_Short', 'MA_Long']].values
             y = df_clean['Target'].values
             
