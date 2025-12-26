@@ -120,27 +120,54 @@ else:
         with st.spinner(f"📊 Fetching data for {ticker.upper()}..."):
             data = yf.download(ticker, start=start_date, end=end_date, progress=False)
         
+        # Validate data was fetched successfully
+        if data is None or len(data) == 0:
+            st.error(f"❌ Error: No data found for ticker '{ticker.upper()}'. Please check the ticker symbol.")
+            st.info("💡 Try using a valid stock ticker like AAPL, GOOGL, MSFT, or TSLA.")
+            st.stop()
+        
         # Handle MultiIndex columns if present (yfinance sometimes returns this)
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.get_level_values(0)
         
+        # Check if Close column exists
+        if 'Close' not in data.columns:
+            st.error("❌ Error: Could not retrieve price data. Please check the ticker symbol.")
+            st.stop()
+        
         df = data[['Close']].copy()
         
+        # Check for NaN values in raw data
+        if df['Close'].isna().sum() == len(df):
+            st.error("❌ Error: All price data is missing. Please try a different ticker or date range.")
+            st.stop()
+        
+        # Remove leading NaN values
+        df = df.dropna()
+        
+        if len(df) == 0:
+            st.error("❌ Error: No valid price data available. Please try a different ticker or date range.")
+            st.stop()
+        
         if len(df) < 50:
-            st.warning("⚠️ Warning: Not enough data. Consider extending the date range.")
+            st.warning(f"⚠️ Warning: Limited data ({len(df)} points). Consider extending the date range for better predictions.")
         
         # Feature engineering - do this before tabs so data is ready for all tabs
         with st.spinner("⚙️ Creating features..."):
-            df['MA_Short'] = df['Close'].rolling(window=ma_short).mean()
-            df['MA_Long'] = df['Close'].rolling(window=ma_long).mean()
+            # Use smaller window sizes if data is limited
+            actual_ma_short = min(ma_short, len(df) // 3)
+            actual_ma_long = min(ma_long, len(df) // 2)
+            
+            df['MA_Short'] = df['Close'].rolling(window=actual_ma_short).mean()
+            df['MA_Long'] = df['Close'].rolling(window=actual_ma_long).mean()
             df['Target'] = df['Close'].shift(-1)
             
             df_clean = df.dropna()
             
             # Validate we have enough data for train/test split
             min_samples = int(10 / (test_size/100))  # At least 10 test samples
-            if len(df_clean) < max(30, min_samples):
-                st.error(f"❌ Error: Not enough data for analysis. Need at least {max(30, min_samples)} data points, but only have {len(df_clean)} after cleaning.")
+            if len(df_clean) < max(20, min_samples):
+                st.error(f"❌ Error: Not enough clean data for analysis. Need at least {max(20, min_samples)} data points, but only have {len(df_clean)} after processing.")
                 st.info("💡 Tip: Try extending the date range or selecting a more established stock ticker.")
                 st.stop()
             
