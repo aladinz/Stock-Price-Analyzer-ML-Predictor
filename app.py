@@ -462,6 +462,119 @@ else:
                 st.markdown(f"🎯 Entry: ${current_price:.2f}  \n🛑 SL: ${suggested_stop_loss:.2f}  \n💰 TP: ${suggested_tp:.2f}")
             
             st.markdown("---")
+            
+            # Modern Signal Details Chart
+            st.markdown("### 📊 Signal Details Visualization", unsafe_allow_html=True)
+            
+            # Create gauge chart for signal strength
+            fig_gauge = go.Figure(data=[go.Gauge(
+                mode = "gauge+number+delta",
+                value = recommendation_score,
+                title = {'text': "Trading Signal Strength"},
+                delta = {'reference': 50, 'suffix': "% vs Neutral"},
+                gauge = {
+                    'axis': {'range': [0, 100]},
+                    'bar': {'color': "#00D9FF"},
+                    'steps': [
+                        {'range': [0, 25], 'color': "#FFE5E5"},
+                        {'range': [25, 40], 'color': "#FFCCCC"},
+                        {'range': [40, 60], 'color': "#FFFFCC"},
+                        {'range': [60, 75], 'color': "#E5F5E5"},
+                        {'range': [75, 100], 'color': "#CCFFCC"}
+                    ],
+                    'threshold': {
+                        'line': {'color': "red", 'width': 4},
+                        'thickness': 0.75,
+                        'value': 90}
+                }
+            )])
+            fig_gauge.update_layout(
+                height=350,
+                template='plotly_dark',
+                font=dict(family="Arial, sans-serif", size=14, color='#CCCCCC'),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(l=30, r=30, t=80, b=30)
+            )
+            st.plotly_chart(fig_gauge, use_container_width=True)
+            
+            # Signal breakdown bar chart
+            signals_data = {
+                'Signal Type': ['Bullish', 'Bearish'],
+                'Count': [signals_bullish, signals_bearish],
+                'Color': ['#00FF00', '#FF0000']
+            }
+            
+            fig_signals = go.Figure()
+            fig_signals.add_trace(go.Bar(
+                x=signals_data['Signal Type'],
+                y=signals_data['Count'],
+                marker_color=signals_data['Color'],
+                text=signals_data['Count'],
+                textposition='auto',
+                hovertemplate='<b>%{x}</b><br>Count: %{y}<extra></extra>',
+                showlegend=False
+            ))
+            fig_signals.update_layout(
+                title="Trading Signals Breakdown",
+                xaxis_title="Signal Type",
+                yaxis_title="Count",
+                height=300,
+                template='plotly_dark',
+                showlegend=False,
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(100,100,100,0.3)'),
+                margin=dict(l=60, r=30, t=60, b=60),
+                font=dict(family="Arial, sans-serif", size=12, color='#CCCCCC')
+            )
+            st.plotly_chart(fig_signals, use_container_width=True)
+            
+            # Detailed signal indicators table
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.markdown("#### 📌 Individual Signal Status")
+                signal_status_data = []
+                
+                signal_status_data.append({
+                    'Indicator': 'RSI Momentum',
+                    'Value': f"{current_rsi:.2f}",
+                    'Status': '🟢 Bullish' if current_rsi < 50 else '🔴 Bearish',
+                    'Interpretation': 'Oversold (<30)' if current_rsi < 30 else ('Overbought (>70)' if current_rsi > 70 else 'Neutral')
+                })
+                
+                signal_status_data.append({
+                    'Indicator': 'MACD Cross',
+                    'Value': f"{current_macd:.4f}",
+                    'Status': '🟢 Bullish' if current_macd > current_signal else '🔴 Bearish',
+                    'Interpretation': f"Signal: {current_signal:.4f}"
+                })
+                
+                bb_pos = "Upper Zone" if bb_position > 80 else ("Lower Zone" if bb_position < 20 else "Mid Zone")
+                signal_status_data.append({
+                    'Indicator': 'Bollinger Band',
+                    'Value': f"{bb_position:.1f}%",
+                    'Status': '🟡 Neutral' if 20 <= bb_position <= 80 else ('🔴 Bearish' if bb_position > 80 else '🟢 Bullish'),
+                    'Interpretation': bb_pos
+                })
+                
+                signal_status_data.append({
+                    'Indicator': 'ML Prediction',
+                    'Value': f"${predicted_next_price:.2f}",
+                    'Status': '🟢 Bullish' if predicted_next_price > current_price else '🔴 Bearish',
+                    'Interpretation': f"vs Current: ${current_price:.2f}"
+                })
+                
+                signal_df = pd.DataFrame(signal_status_data)
+                st.dataframe(signal_df, use_container_width=True, hide_index=True)
+            
+            with col2:
+                st.markdown("#### 🎯 Key Levels")
+                st.metric("Resistance", f"${resistance:.2f}")
+                st.metric("Current", f"${current_price:.2f}")
+                st.metric("Support", f"${support:.2f}")
+                st.metric("ATR", f"${current_atr:.2f}")
+            
+            st.markdown("---")
             st.markdown("#### Signal Details")
             for detail in signal_details:
                 st.write(detail)
