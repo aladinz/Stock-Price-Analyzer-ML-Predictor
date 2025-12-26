@@ -149,19 +149,23 @@ else:
             st.error("❌ Error: No valid price data available. Please try a different ticker or date range.")
             st.stop()
         
-        if len(df) < 50:
-            st.warning(f"⚠️ Warning: Limited data ({len(df)} points). Consider extending the date range for better predictions.")
+        if len(df) < 20:
+            st.warning(f"⚠️ Warning: Very limited data ({len(df)} points). Consider extending the date range for better predictions.")
         
         # Feature engineering - do this before tabs so data is ready for all tabs
         with st.spinner("⚙️ Creating features..."):
             # Dynamically adjust window sizes based on available data
-            # Ensure windows are small enough to leave data after dropna()
-            actual_ma_short = max(2, min(ma_short, max(3, len(df) // 4)))
-            actual_ma_long = max(3, min(ma_long, max(5, len(df) // 3)))
+            # For small datasets, use very small windows to preserve data
+            if len(df) < 30:
+                actual_ma_short = 2
+                actual_ma_long = 3
+            else:
+                actual_ma_short = max(2, min(ma_short, max(3, len(df) // 10)))
+                actual_ma_long = max(3, min(ma_long, max(5, len(df) // 8)))
             
             # Ensure long MA is larger than short MA
             if actual_ma_long <= actual_ma_short:
-                actual_ma_long = actual_ma_short + 2
+                actual_ma_long = actual_ma_short + 1
             
             df['MA_Short'] = df['Close'].rolling(window=actual_ma_short).mean()
             df['MA_Long'] = df['Close'].rolling(window=actual_ma_long).mean()
@@ -170,7 +174,7 @@ else:
             df_clean = df.dropna()
             
             # For small datasets, be very lenient with minimum samples
-            if len(df_clean) < 5:
+            if len(df_clean) < 3:
                 st.error(f"❌ Error: Not enough data after processing. Have {len(df)} raw points but only {len(df_clean)} after feature engineering.")
                 st.info(f"💡 Try one of these:\n- Extend your date range (currently {(end_date - start_date).days} days)\n- Check ticker symbol is correct\n- Use a more established stock ticker")
                 st.stop()
@@ -178,8 +182,11 @@ else:
             X = df_clean[['Close', 'MA_Short', 'MA_Long']].values
             y = df_clean['Target'].values
             
+            # For very small datasets, use a smaller test size
+            actual_test_size = min(test_size/100, 0.4) if len(df_clean) < 10 else test_size/100
+            
             X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=test_size/100, random_state=42
+                X, y, test_size=actual_test_size, random_state=42
             )
             
             model = LinearRegression()
@@ -365,14 +372,21 @@ else:
         with tab4:
             st.markdown("<div class='subheader-style'>💹 SWING TRADING ANALYSIS</div>", unsafe_allow_html=True)
             
-            # Calculate technical indicators
-            rsi = calculate_rsi(df['Close'], period=14)
-            macd_line, signal_line, histogram = calculate_macd(df['Close'])
-            upper_bb, middle_bb, lower_bb = calculate_bollinger_bands(df['Close'], period=20)
+            # Calculate technical indicators with dynamic periods based on data size
+            rsi_period = max(2, min(14, len(df) // 3))
+            macd_fast = max(2, min(12, len(df) // 5))
+            macd_slow = max(3, min(26, len(df) // 4))
+            bb_period = max(2, min(20, len(df) // 3))
+            atr_period = max(2, min(14, len(df) // 3))
+            
+            rsi = calculate_rsi(df['Close'], period=rsi_period)
+            macd_line, signal_line, histogram = calculate_macd(df['Close'], fast=macd_fast, slow=macd_slow)
+            upper_bb, middle_bb, lower_bb = calculate_bollinger_bands(df['Close'], period=bb_period)
             atr = calculate_atr(df['High'] if 'High' in df.columns else df['Close'], 
                                df['Low'] if 'Low' in df.columns else df['Close'], 
-                               df['Close'], period=14)
-            support, resistance = find_support_resistance(df['Close'], lookback=20)
+                               df['Close'], period=atr_period)
+            lookback_period = max(2, min(20, len(df) // 3))
+            support, resistance = find_support_resistance(df['Close'], lookback=lookback_period)
             
             current_price = float(df['Close'].iloc[-1])
             current_rsi = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50
@@ -469,7 +483,7 @@ else:
                 else:
                     signal_color = "🟡"
                     signal_text = "Neutral"
-                st.metric(f"RSI (14) {signal_color}", f"{current_rsi:.2f}", signal_text)
+                st.metric(f"RSI ({rsi_period}) {signal_color}", f"{current_rsi:.2f}", signal_text)
             
             # MACD Signal
             with col2:
@@ -499,10 +513,10 @@ else:
             
             with col1:
                 bb_position = ((current_price - current_lower_bb) / (current_upper_bb - current_lower_bb)) * 100
-                st.metric("Bollinger Band Position", f"{bb_position:.1f}%", 
+                st.metric(f"Bollinger Band Position ({bb_period})", f"{bb_position:.1f}%", 
                          "Near Upper" if bb_position > 80 else ("Near Lower" if bb_position < 20 else "Mid-range"))
             with col2:
-                st.metric("ATR (14)", f"${current_atr:.2f}", "Volatility Measure")
+                st.metric(f"ATR ({atr_period})", f"${current_atr:.2f}", "Volatility Measure")
             with col3:
                 suggested_stop_loss = current_price - (current_atr * 2)
                 suggested_tp = current_price + (current_atr * 3)
