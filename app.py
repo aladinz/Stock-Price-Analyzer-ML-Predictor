@@ -395,6 +395,10 @@ else:
             current_upper_bb = float(upper_bb.iloc[-1]) if not pd.isna(upper_bb.iloc[-1]) else current_price
             current_lower_bb = float(lower_bb.iloc[-1]) if not pd.isna(lower_bb.iloc[-1]) else current_price
             current_atr = float(atr.iloc[-1]) if not pd.isna(atr.iloc[-1]) else 0
+            current_middle_bb = float(middle_bb.iloc[-1]) if not pd.isna(middle_bb.iloc[-1]) else current_price
+            
+            # Calculate Bollinger Band position
+            bb_position = ((current_price - current_lower_bb) / (current_upper_bb - current_lower_bb)) * 100 if current_upper_bb != current_lower_bb else 50
             
             # ===== SECTION 4: Trading Summary & Recommendation (MOVED TO TOP) =====
             st.markdown("### 📋 Trading Summary & Recommendation", unsafe_allow_html=True)
@@ -418,7 +422,7 @@ else:
                 signals_bearish += 1
                 signal_details.append("❌ MACD below signal line (bearish)")
             
-            if float(current_price) > float(middle_bb.iloc[-1]):
+            if float(current_price) > float(current_middle_bb):
                 signals_bullish += 1
                 signal_details.append("✅ Price above middle BB (uptrend)")
             else:
@@ -647,7 +651,6 @@ else:
             col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
             
             with col1:
-                bb_position = ((current_price - current_lower_bb) / (current_upper_bb - current_lower_bb)) * 100
                 st.metric(f"Bollinger Band Position ({bb_period})", f"{bb_position:.1f}%", 
                          "Near Upper" if bb_position > 80 else ("Near Lower" if bb_position < 20 else "Mid-range"))
             with col2:
