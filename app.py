@@ -108,8 +108,8 @@ with col2:
 # Advanced settings
 with st.sidebar.expander("🔧 Advanced Settings"):
     test_size = st.slider("Test Set Size (%)", min_value=10, max_value=50, value=20)
-    ma_short = st.slider("Short Moving Average (days)", min_value=3, max_value=20, value=5)
-    ma_long = st.slider("Long Moving Average (days)", min_value=10, max_value=100, value=20)
+    ma_short = st.slider("Short Moving Average (days)", min_value=2, max_value=20, value=3)
+    ma_long = st.slider("Long Moving Average (days)", min_value=3, max_value=100, value=5)
 
 # Validate inputs
 if start_date >= end_date:
@@ -169,17 +169,10 @@ else:
             
             df_clean = df.dropna()
             
-            # For small datasets, be more lenient with minimum samples
-            if len(df) < 30:
-                # For very small datasets (< 30 points), just need at least 5 clean samples
-                min_samples = max(5, int(5 / (test_size/100)))
-            else:
-                # For normal datasets, need at least 10 test samples
-                min_samples = max(15, int(10 / (test_size/100)))
-            
-            if len(df_clean) < min_samples:
-                st.error(f"❌ Error: Not enough clean data for analysis. Have {len(df)} raw points but only {len(df_clean)} after feature engineering.")
-                st.info(f"💡 Try one of these:\n- Extend your date range (currently {(end_date - start_date).days} days)\n- Reduce the moving average window sizes\n- Use a more established stock ticker")
+            # For small datasets, be very lenient with minimum samples
+            if len(df_clean) < 5:
+                st.error(f"❌ Error: Not enough data after processing. Have {len(df)} raw points but only {len(df_clean)} after feature engineering.")
+                st.info(f"💡 Try one of these:\n- Extend your date range (currently {(end_date - start_date).days} days)\n- Check ticker symbol is correct\n- Use a more established stock ticker")
                 st.stop()
             
             X = df_clean[['Close', 'MA_Short', 'MA_Long']].values
