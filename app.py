@@ -466,35 +466,57 @@ else:
             # Modern Signal Details Chart
             st.markdown("### 📊 Signal Details Visualization", unsafe_allow_html=True)
             
-            # Create gauge chart for signal strength
-            fig_gauge = go.Figure(data=[go.Gauge(
-                mode = "gauge+number+delta",
-                value = recommendation_score,
-                title = {'text': "Trading Signal Strength"},
-                delta = {'reference': 50, 'suffix': "% vs Neutral"},
-                gauge = {
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': "#00D9FF"},
-                    'steps': [
-                        {'range': [0, 25], 'color': "#FFE5E5"},
-                        {'range': [25, 40], 'color': "#FFCCCC"},
-                        {'range': [40, 60], 'color': "#FFFFCC"},
-                        {'range': [60, 75], 'color': "#E5F5E5"},
-                        {'range': [75, 100], 'color': "#CCFFCC"}
-                    ],
-                    'threshold': {
-                        'line': {'color': "red", 'width': 4},
-                        'thickness': 0.75,
-                        'value': 90}
-                }
-            )])
+            # Create circular signal strength chart
+            fig_gauge = go.Figure()
+            
+            # Add background circle
+            theta = np.linspace(0, 2*np.pi, 100)
+            fig_gauge.add_trace(go.Scatterpolar(
+                r=[1]*100,
+                theta=np.degrees(theta),
+                fill='toself',
+                name='Background',
+                marker_color='rgba(50,50,50,0.3)',
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+            
+            # Add signal strength arc
+            signal_angle = (recommendation_score / 100) * 360
+            theta_signal = np.linspace(0, np.radians(signal_angle), 50)
+            fig_gauge.add_trace(go.Scatterpolar(
+                r=[0.8]*50,
+                theta=np.degrees(theta_signal),
+                fill='toself',
+                name='Signal Strength',
+                marker_color='#00D9FF',
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+            
+            # Add center text annotation
+            fig_gauge.add_annotation(
+                x=0.5, y=0.5,
+                xref='paper', yref='paper',
+                text=f"<b>{recommendation_score:.0f}%</b><br><sub>Signal Strength</sub>",
+                showarrow=False,
+                font=dict(size=32, color='#00D9FF', family="Arial Black"),
+                xanchor='center', yanchor='middle'
+            )
+            
             fig_gauge.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=False, range=[0, 1]),
+                    angularaxis=dict(visible=False),
+                    bgcolor='rgba(0,0,0,0)'
+                ),
                 height=350,
                 template='plotly_dark',
                 font=dict(family="Arial, sans-serif", size=14, color='#CCCCCC'),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=30, r=30, t=80, b=30)
+                margin=dict(l=30, r=30, t=30, b=30),
+                showlegend=False
             )
             st.plotly_chart(fig_gauge, use_container_width=True)
             
