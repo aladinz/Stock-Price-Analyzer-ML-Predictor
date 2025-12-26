@@ -108,8 +108,8 @@ with col2:
 # Advanced settings
 with st.sidebar.expander("🔧 Advanced Settings"):
     test_size = st.slider("Test Set Size (%)", min_value=10, max_value=50, value=20)
-    ma_short = st.slider("Short Moving Average (days)", min_value=5, max_value=20, value=10)
-    ma_long = st.slider("Long Moving Average (days)", min_value=30, max_value=100, value=50)
+    ma_short = st.slider("Short Moving Average (days)", min_value=3, max_value=20, value=5)
+    ma_long = st.slider("Long Moving Average (days)", min_value=10, max_value=100, value=20)
 
 # Validate inputs
 if start_date >= end_date:
@@ -154,9 +154,14 @@ else:
         
         # Feature engineering - do this before tabs so data is ready for all tabs
         with st.spinner("⚙️ Creating features..."):
-            # Use smaller window sizes if data is limited
-            actual_ma_short = min(ma_short, len(df) // 3)
-            actual_ma_long = min(ma_long, len(df) // 2)
+            # Dynamically adjust window sizes based on available data
+            # Ensure windows are small enough to leave data after dropna()
+            actual_ma_short = max(2, min(ma_short, max(3, len(df) // 4)))
+            actual_ma_long = max(3, min(ma_long, max(5, len(df) // 3)))
+            
+            # Ensure long MA is larger than short MA
+            if actual_ma_long <= actual_ma_short:
+                actual_ma_long = actual_ma_short + 2
             
             df['MA_Short'] = df['Close'].rolling(window=actual_ma_short).mean()
             df['MA_Long'] = df['Close'].rolling(window=actual_ma_long).mean()
@@ -164,11 +169,17 @@ else:
             
             df_clean = df.dropna()
             
-            # Validate we have enough data for train/test split
-            min_samples = int(10 / (test_size/100))  # At least 10 test samples
-            if len(df_clean) < max(20, min_samples):
-                st.error(f"❌ Error: Not enough clean data for analysis. Need at least {max(20, min_samples)} data points, but only have {len(df_clean)} after processing.")
-                st.info("💡 Tip: Try extending the date range or selecting a more established stock ticker.")
+            # For small datasets, be more lenient with minimum samples
+            if len(df) < 30:
+                # For very small datasets (< 30 points), just need at least 5 clean samples
+                min_samples = max(5, int(5 / (test_size/100)))
+            else:
+                # For normal datasets, need at least 10 test samples
+                min_samples = max(15, int(10 / (test_size/100)))
+            
+            if len(df_clean) < min_samples:
+                st.error(f"❌ Error: Not enough clean data for analysis. Have {len(df)} raw points but only {len(df_clean)} after feature engineering.")
+                st.info(f"💡 Try one of these:\n- Extend your date range (currently {(end_date - start_date).days} days)\n- Reduce the moving average window sizes\n- Use a more established stock ticker")
                 st.stop()
             
             X = df_clean[['Close', 'MA_Short', 'MA_Long']].values
